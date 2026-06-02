@@ -21,10 +21,10 @@ runtime code, confidential release systems, or internal automation assets.
 
 ## Quick Start
 
-Install the signed macOS package:
+Install the signed macOS package with Homebrew:
 
 ```sh
-curl -fsSL https://get.mentu.ai | sh
+brew install --cask mentu-ai/tap/mentu-recipes
 ```
 
 Or install the published package directly from GitHub:

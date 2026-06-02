@@ -5,16 +5,14 @@
 Install the signed and notarized macOS package:
 
 ```sh
-curl -fsSL https://get.mentu.ai | sh
+brew install --cask mentu-ai/tap/mentu-recipes
 ```
 
-The installer:
+The Homebrew cask:
 
-1. Fetches the release manifest from `api.mentu.ai`.
-2. Downloads the package for your platform.
-3. Verifies the SHA-256 checksum.
-4. Verifies the package with Gatekeeper.
-5. Installs `mentu-recipes` to `/usr/local/bin/mentu-recipes`.
+1. Downloads the signed package from the GitHub release.
+2. Verifies the SHA-256 checksum.
+3. Installs `mentu-recipes` to `/usr/local/bin/mentu-recipes`.
 
 ## Direct Release Package
 

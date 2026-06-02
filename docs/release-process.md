@@ -58,7 +58,7 @@ For `v0.1.0`:
 
 - package: `mentu-recipes-0.1.0-macos-arm64.pkg`
 - SHA-256: `a6ab0e0125c90cb1d57361972dc9eeada229a7d9b4c8d3599388c1ada6cee560`
-- installer: `curl -fsSL https://get.mentu.ai | sh`
+- Homebrew cask: `brew install --cask mentu-ai/tap/mentu-recipes`
 - direct package:
   `https://github.com/mentu-ai/mentu-recipes/releases/download/v0.1.0/mentu-recipes-0.1.0-macos-arm64.pkg`
 
