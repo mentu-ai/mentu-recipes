@@ -1,10 +1,13 @@
 # Release Process
 
-This repo ships a public source package and a signed macOS package.
+This repository ships a public source package and CI-built, attested macOS
+binaries. Nothing is built on a maintainer laptop. The full checklist a
+maintainer follows is [RELEASE-CHECKLIST.md](../RELEASE-CHECKLIST.md); this
+page explains the machinery it relies on.
 
-## Source Gate
+## Source gate
 
-Run:
+Every pull request and every push to `main` runs:
 
 ```sh
 swift test
@@ -12,57 +15,47 @@ swift run mentu-recipes scan .
 ./scripts/release-validate.sh --source
 ```
 
-The source gate checks for:
+The source gate checks for protected internal terms, likely secret tokens,
+local user paths, confidential markers, and protected local state paths. It
+runs from this repository as checked out and does not depend on any sibling
+private source tree.
 
-- protected internal terms
-- likely secret tokens
-- local user paths
-- confidential markers
-- protected local state paths
+## Release workflow
 
-The source gate runs from the public repo as checked out. It does not depend on
-a sibling private source tree.
+Pushing a tag of the form `vX.Y.Z` runs `.github/workflows/release.yml`, which:
 
-## macOS Package Gate
+1. refuses to continue unless `Sources/mentu-recipes/Version.swift` declares
+   the same version as the tag;
+2. runs the test suite and the source gate;
+3. builds a universal release binary and splits it into `arm64` and `x86_64`
+   artifacts, stripped and ad-hoc signed;
+4. runs the binary gate (`release-validate.sh --binary`) on each artifact;
+5. writes `checksums.txt`;
+6. publishes a Sigstore build-provenance attestation for both binaries;
+7. creates the GitHub release with generated notes and the three assets.
 
-The release script builds, strips, signs, validates, packages, notarizes, and
-staples the package:
+The binary you download can be tied back to this workflow, this repository,
+and the tagged commit:
 
 ```sh
-./scripts/release-macos.sh
+gh attestation verify mentu-recipes-macos-arm64 --repo mentu-ai/mentu-recipes
 ```
 
-Maintainers who intentionally want to refresh the public runtime from a sibling
-source checkout can opt in:
+## Distribution channels
 
-```sh
-SYNC_FROM_SOURCE=1 ./scripts/release-macos.sh
-```
+| Channel | What it serves | How it is updated |
+| --- | --- | --- |
+| GitHub release | `mentu-recipes-macos-arm64`, `mentu-recipes-macos-x86_64`, `checksums.txt` | by `release.yml` on tag push |
+| Homebrew formula `mentu-ai/tap/mentu-recipes-bin` | the attested release binaries | a commit to the tap bumping `version` and both `sha256` values |
+| Homebrew cask `mentu-ai/tap/mentu-recipes` and the `get.mentu.ai` installer | a signed and notarized `.pkg` registered in the Mentu release manifest | `scripts/release-macos.sh` produces the package; the manifest is updated through the release registry |
 
-The sync step copies only `Package.swift`, `Sources`, and `Tests`; public docs,
-license, examples, and release materials stay owned by this repository.
+The formula is the recommended path. The package channels require the
+notarized `.pkg`; a release that does not produce one must leave the cask and
+the manifest untouched, so they never point at a version whose package does not
+exist.
 
-The package gate scans:
+## Public repo rule
 
-- compiled binary strings
-- compiled binary symbols
-- expanded package payload strings
-- package payload shape
-
-Scan staged, stripped artifacts. Raw SwiftPM release binaries can include local
-build paths before `strip -x`, and the scanner will correctly reject them.
-
-## Published Artifacts
-
-For `v0.1.0`:
-
-- package: `mentu-recipes-0.1.0-macos-arm64.pkg`
-- SHA-256: `a6ab0e0125c90cb1d57361972dc9eeada229a7d9b4c8d3599388c1ada6cee560`
-- Homebrew cask: `brew install --cask mentu-ai/tap/mentu-recipes`
-- direct package:
-  `https://github.com/mentu-ai/mentu-recipes/releases/download/v0.1.0/mentu-recipes-0.1.0-macos-arm64.pkg`
-
-## Public Repo Rule
-
-Only the recipe engine belongs here. Private platform internals and
-confidential release materials must stay out of this repo.
+Only the recipe runner belongs here. Private platform internals and
+confidential release materials stay out of this repository, and the source
+gate enforces the terms that would reveal them.

@@ -34,6 +34,8 @@ enum CLI {
                 try vault(args)
             case "scan":
                 try scan(args)
+            case "--version", "-V", "version":
+                print("mentu-recipes \(MentuRecipesVersion.string)")
             case "--help", "-h", "help":
                 help()
             default:
@@ -316,6 +318,7 @@ enum CLI {
           mentu-recipes adapters [--json|--explain NAME]
           mentu-recipes vault <set|get|list|delete> ...
           mentu-recipes scan [path] [--artifact PATH]
+          mentu-recipes --version
         """)
     }
 }
