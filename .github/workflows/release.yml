@@ -24,27 +24,16 @@ jobs:
         run: swift --version
 
       - name: Version Matches Tag
-
         env:
-
           TAG: ${{ github.ref_name }}
-
         run: |
-
           set -eu
-
           declared="$(sed -n 's/.*static let string = "\([^"]*\)".*/\1/p' Sources/mentu-recipes/Version.swift)"
-
           if [ "v${declared}" != "${TAG}" ]; then
-
             echo "Version.swift declares ${declared} but the tag is ${TAG}" >&2
-
             exit 1
-
           fi
-
           echo "Version ${declared} matches ${TAG}"
-
 
       - name: Test
         run: swift test
