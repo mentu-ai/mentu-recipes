@@ -270,7 +270,7 @@ vulnerability, see [SECURITY.md](SECURITY.md).
 Honest state of this repository, verified on 2026-09-02 on macOS 15 with Swift 6:
 
 - `swift build`: clean, no errors.
-- `swift test`: **70 tests, 0 failures**, in about 2 seconds. No hangs, no
+- `swift test`: **94 tests, 0 failures** (9 skipped without Pi installed), in about 2 seconds. No hangs, no
   crashes. The swift-testing half of the run is empty; every test here is XCTest.
 - All six bundled demo recipes score **100 with no findings** under
   `mentu-recipes doctor`, and all three demos were executed end to end for the
