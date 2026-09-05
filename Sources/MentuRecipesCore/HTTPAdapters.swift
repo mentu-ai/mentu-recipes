@@ -282,7 +282,7 @@ public struct OpenAIChatAdapter: BackendAdapter {
     }
 }
 
-private enum ProviderCredentialPolicy {
+enum ProviderCredentialPolicy {
     static func validateDestination(name: String, baseURL: String, apiKeyEnv: String, apiKeyVault: String?) throws {
         guard let host = URL(string: baseURL)?.host?.lowercased() else {
             throw RecipeError.failed("Invalid provider base_url for \(name): \(baseURL)")

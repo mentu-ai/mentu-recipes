@@ -14,6 +14,7 @@ recipe level, step level, or CLI level.
 | `ollama` | local HTTP LLM | Uses `http://localhost:11434/v1`. |
 | `claude` | CLI agent | Uses the local Claude CLI when available. |
 | `codex` | CLI agent | Uses the local Codex CLI when available. |
+| `pi` | CLI agent | Explicit configured provider; runs Pi tools and reports token usage. See [Pi agent](pi-backend.md). |
 
 ## Selection Order
 
@@ -24,7 +25,7 @@ Backend selection follows this order:
 3. Recipe `backend`
 4. Auto-detect from available non-shell providers
 
-Shell is never auto-detected.
+Shell and Pi are never auto-detected.
 
 Auto-detect is intentionally non-blocking: it checks environment variables and
 local executables, but does not open the macOS Keychain. If a provider key only

@@ -100,6 +100,12 @@ public struct ProviderConfig: Codable, Sendable {
     public let apiKeyEnv: String?
     public let apiKeyVault: String?
     public let model: String?
+    /// Which agent CLI an `api: "cli"` provider drives: `claude` (default),
+    /// `codex`, or `pi`. One neutral field instead of one API case per vendor.
+    public let agent: String?
+    public let maxTokensField: ChatCompletionTokenField?
+    public let contextWindow: Int?
+    public let skills: [String]?
 
     enum CodingKeys: String, CodingKey {
         case api
@@ -107,6 +113,10 @@ public struct ProviderConfig: Codable, Sendable {
         case apiKeyEnv = "api_key_env"
         case apiKeyVault = "api_key_vault"
         case model
+        case agent
+        case maxTokensField = "max_tokens_field"
+        case contextWindow = "context_window"
+        case skills
     }
 }
 
@@ -115,6 +125,11 @@ public enum ProviderAPI: String, Codable, Sendable {
     case chatCompletions = "chat_completions"
     case cli
     case shell
+}
+
+public enum ChatCompletionTokenField: String, Codable, Sendable {
+    case maxTokens = "max_tokens"
+    case maxCompletionTokens = "max_completion_tokens"
 }
 
 public struct RecipeStep: Codable, Sendable {
