@@ -482,4 +482,10 @@ enum CLI {
     }
 }
 
-exit(await CLI.main())
+if ["run", "resume", "retry-step"].contains(CommandLine.arguments.dropFirst().first ?? "") {
+    let cancellation = CLISignalCancellation()
+    let result = await cancellation.run { await CLI.main() }
+    withExtendedLifetime(cancellation) { exit(result) }
+} else {
+    exit(await CLI.main())
+}

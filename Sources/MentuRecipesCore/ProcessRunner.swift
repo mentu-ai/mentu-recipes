@@ -46,6 +46,7 @@ public enum ProcessRunner {
         stdoutSink: @escaping (String) -> Void,
         stderrSink: @escaping (String) -> Void
     ) async throws -> AdapterResult {
+        try Task.checkCancellation()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -62,60 +63,68 @@ public enum ProcessRunner {
         let buffer = OutputBuffer(maxBytes: maxOutputBytes)
         let readers = DispatchGroup()
 
-        try process.run()
-        try? stdin.fileHandleForWriting.close()
+        let cancellation = ProcessCancellation(process)
+        return try await withTaskCancellationHandler {
+            try cancellation.start()
+            defer { cancellation.finish() }
+            try? stdin.fileHandleForWriting.close()
 
-        startReader(
-            handle: stdout.fileHandleForReading,
-            group: readers,
-            append: buffer.appendStdout,
-            sink: stdoutSink
-        )
-        startReader(
-            handle: stderr.fileHandleForReading,
-            group: readers,
-            append: buffer.appendStderr,
-            sink: stderrSink
-        )
+            startReader(
+                handle: stdout.fileHandleForReading,
+                group: readers,
+                append: buffer.appendStdout,
+                sink: stdoutSink
+            )
+            startReader(
+                handle: stderr.fileHandleForReading,
+                group: readers,
+                append: buffer.appendStderr,
+                sink: stderrSink
+            )
 
-        let exitTask = Task {
-            await waitForExit(process)
-        }
-
-        let timedOut: Bool
-        if timeout > 0 {
-            timedOut = !(await completedBeforeTimeout(exitTask, seconds: timeout))
-        } else {
-            await exitTask.value
-            timedOut = false
-        }
-
-        if timedOut {
-            process.terminate()
-            if !(await completedBeforeTimeout(exitTask, seconds: 2)) {
-                kill(process.processIdentifier, SIGKILL)
-                await exitTask.value
+            let exitTask = Task {
+                await waitForExit(process)
             }
+
+            let timedOut: Bool
+            if timeout > 0 {
+                timedOut = !(await completedBeforeTimeout(exitTask, seconds: timeout))
+            } else {
+                await exitTask.value
+                timedOut = false
+            }
+
+            if timedOut {
+                process.terminate()
+                if !(await completedBeforeTimeout(exitTask, seconds: 2)) {
+                    kill(process.processIdentifier, SIGKILL)
+                    await exitTask.value
+                }
+            }
+
+            if timedOut {
+                try? stdout.fileHandleForReading.close()
+                try? stderr.fileHandleForReading.close()
+            }
+            await waitForReaders(readers, timeout: 2)
+
+            let snapshot = buffer.snapshot()
+            let cancelled = cancellation.wasCancelled
+            let code = cancelled ? Int32(130) : timedOut ? Int32(124) : process.terminationStatus
+            let stderrText = cancelled ? snapshot.stderr + "\n[mentu-recipes] execution cancelled\n"
+                : timedOut ? snapshot.stderr + "\n[mentu-recipes] timeout after \(timeout)s\n" : snapshot.stderr
+
+            return AdapterResult(
+                stdout: snapshot.stdout,
+                stderr: stderrText,
+                exitCode: code,
+                providerCompleted: !cancelled && !timedOut && code == 0,
+                inputTokens: nil,
+                outputTokens: nil
+            )
+        } onCancel: {
+            cancellation.cancel()
         }
-
-        if timedOut {
-            try? stdout.fileHandleForReading.close()
-            try? stderr.fileHandleForReading.close()
-        }
-        await waitForReaders(readers, timeout: 2)
-
-        let snapshot = buffer.snapshot()
-        let code = timedOut ? Int32(124) : process.terminationStatus
-        let stderrText = timedOut ? snapshot.stderr + "\n[mentu-recipes] timeout after \(timeout)s\n" : snapshot.stderr
-
-        return AdapterResult(
-            stdout: snapshot.stdout,
-            stderr: stderrText,
-            exitCode: code,
-            providerCompleted: !timedOut && code == 0,
-            inputTokens: nil,
-            outputTokens: nil
-        )
     }
 
     private static func startReader(

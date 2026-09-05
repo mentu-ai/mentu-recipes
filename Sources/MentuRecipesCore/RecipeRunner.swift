@@ -173,6 +173,7 @@ public final class RecipeRunner {
     }
 
     public func run(_ nameOrPath: String) async throws -> RecipeRunRecord {
+        try Task.checkCancellation()
         if options.planDigest != nil || options.requestKey != nil {
             return try await AdmittedExecution.execute(nameOrPath, options: options)
         }
@@ -180,6 +181,7 @@ public final class RecipeRunner {
     }
 
     func runCaptured(runId: String) async throws -> RecipeRunRecord {
+        try Task.checkCancellation()
         guard let captured else { throw AdmissionError.invalidRequest }
         return try await start(captured.source.path, assignedRunId: runId)
     }
@@ -284,6 +286,7 @@ public final class RecipeRunner {
     }
 
     public func resume(runId: String, retryStep: String? = nil) async throws -> RecipeRunRecord {
+        try Task.checkCancellation()
         try AdmittedExecution.validateRunID(runId)
         if captured == nil, options.planDigest != nil || options.requestKey != nil {
             return try await AdmittedExecution.execute(nil, runId: runId, retryStep: retryStep, options: options)
@@ -782,6 +785,7 @@ public final class RecipeRunner {
         state: RunStateStore,
         vars: [String: String]
     ) async throws -> StepRunRecord {
+        try Task.checkCancellation()
         let backendName = step.backend ?? options.backend ?? recipe.backend
         let frozenStep = captured?.steps[step.label]
         let env = frozenStep?.environment ?? mergedEnvironment(recipeEnv: recipe.env, stepEnv: step.env, vars: vars)
@@ -867,6 +871,10 @@ public final class RecipeRunner {
             try result.stdout.write(to: runDir.appendingPathComponent("\(attemptPrefix).stdout"), atomically: true, encoding: .utf8)
             try result.stderr.write(to: runDir.appendingPathComponent("\(attemptPrefix).stderr"), atomically: true, encoding: .utf8)
             lastLocalComplete = localComplete(step: step, adapter: adapter, result: result)
+            if Task.isCancelled {
+                lastLocalComplete = false
+                break
+            }
             if lastLocalComplete {
                 await events.emit(.verificationStarted, stepLabel: step.label, status: "running")
                 break
@@ -899,7 +907,7 @@ public final class RecipeRunner {
 
         var cloudComplete: Bool?
         var trustScore: Double?
-        if let cloud, recipe.cloud?.evaluateSteps == true {
+        if let cloud, recipe.cloud?.evaluateSteps == true, !Task.isCancelled {
             let tail = String(result.stdout.suffix(8000))
             do {
                 let verdict = try await cloud.evaluateStep(.init(
@@ -922,6 +930,7 @@ public final class RecipeRunner {
 
         var verificationOutcome: VerificationOutcome?
         let processLocalComplete = lastLocalComplete
+        if Task.isCancelled { lastLocalComplete = false }
         if lastLocalComplete {
             verificationOutcome = try await Verification.evaluate(step.verify, stepDir: stepDir, preStepBaseline: preStepBaseline, environment: captured?.environment)
             await events.emit(
@@ -939,6 +948,7 @@ public final class RecipeRunner {
         }
 
         var gitRecord: StepGitRecord?
+        if Task.isCancelled { lastLocalComplete = false }
         if lastLocalComplete {
             gitRecord = await GitWorkspace.finalizeStep(
                 label: step.label,
