@@ -2,5 +2,5 @@
 /// tag whose name does not match this string, so a published binary always
 /// answers `mentu-recipes --version` with the tag it was built from.
 enum MentuRecipesVersion {
-    static let string = "0.4.0"
+    static let string = "0.4.1"
 }
