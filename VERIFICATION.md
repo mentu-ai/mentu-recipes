@@ -33,6 +33,20 @@ gh attestation verify mentu-recipes-macos-arm64 --repo mentu-ai/mentu-recipes
 On Intel, substitute `mentu-recipes-macos-x86_64` in both the download and
 the verify command.
 
+## Transcript, v0.5.0, 2026-09-05
+
+```text
+$ shasum -a 256 -c checksums.txt
+mentu-recipes-macos-arm64: OK
+mentu-recipes-macos-x86_64: OK
+$ gh attestation verify mentu-recipes-macos-arm64 -R mentu-ai/mentu-recipes
+(exit 1)
+$ spctl -a -vv -t install mentu-recipes-0.5.0-macos-arm64.pkg
+/private/tmp/claude-501/-Users-rashid-Desktop-mentu-core-workspace/97adf96e-dddd-42a7-b16e-7e83b7308a32/scratchpad/pkg-0.5.0/dist/mentu-recipes-0.5.0-macos-arm64.pkg: accepted
+source=Notarized Developer ID
+origin=Developer ID Installer: Rashid Azarang (HR8X6TP7J6)
+```
+
 ## Transcript, v0.4.1, 2026-09-05
 
 ```text
