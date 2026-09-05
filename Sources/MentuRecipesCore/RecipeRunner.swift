@@ -979,7 +979,10 @@ public final class RecipeRunner {
             warnings.append(note)
         }
         if !drift.unexpectedPaths.isEmpty, step.expectedChanges != nil {
-            warnings.append("Quarantined changes outside expected_changes: \(drift.unexpectedPaths.joined(separator: ", "))")
+            let message = gitRecord?.quarantineFiles.isEmpty == false
+                ? "Quarantine patch recorded for changes outside expected_changes"
+                : "Changes outside expected_changes (no quarantine patch recorded)"
+            warnings.append("\(message): \(drift.unexpectedPaths.joined(separator: ", "))")
         }
         let stepState: StepExecutionState = lastLocalComplete ? (warnings.isEmpty ? .success : .warnBookkeeping) : .failed
         try? await state.record(label: step.label, state: stepState, message: warnings.first)
