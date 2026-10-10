@@ -250,6 +250,11 @@ public struct CodexJSONParser: Sendable {
             guard let item = json["item"] as? [String: Any],
                   let itemType = item["type"] as? String,
                   ["agent_message", "message"].contains(itemType),
+                  // agent_message is intrinsically assistant output. A generic
+                  // message must identify its role; an echo from another role
+                  // must never satisfy a recipe's completion keyword.
+                  (item["role"] as? String == "assistant" ||
+                   (itemType == "agent_message" && item["role"] == nil)),
                   let text = stringValue(item["text"] ?? item["message"] ?? item["content"]),
                   !text.isEmpty else { return [] }
             return [.text(ensureTrailingNewline(text))]

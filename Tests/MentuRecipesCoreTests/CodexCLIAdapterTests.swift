@@ -194,6 +194,32 @@ final class CodexCLIAdapterTests: XCTestCase {
         }
     }
 
+    func testNonAssistantMessageCannotSatisfyAdmittedCompletionKeyword() async throws {
+        for role in ["user", "system", "developer", "tool"] {
+            let echoed = "{\"type\":\"item.completed\",\"item\":{\"type\":\"message\",\"role\":\"\(role)\",\"text\":\"FIXTURE_COMPLETE\"}}"
+            let root = try fixture(events: echoed + "\n" + completed + "\n")
+            try recipe(in: root, stepExtra: ["sandbox": "read-only"])
+            let options = RunOptions(workspace: root, home: root, quiet: true)
+            let plan = try ExecutionPlan.resolve("demo", options: options)
+            let admitted = RunOptions(workspace: root, home: root, quiet: true,
+                                      planDigest: plan.digest, requestKey: "fixture")
+            let record = try await RecipeRunner(options: admitted).run("demo")
+            XCTAssertEqual(record.outcome, "failed", "\(role) content supplied the completion keyword")
+            XCTAssertEqual(record.steps.first?.localComplete, false)
+        }
+    }
+
+    func testGenericMessageRequiresExplicitAssistantRole() {
+        XCTAssertEqual(CodexJSONParser.parseLine(#"{"type":"item.completed","item":{"type":"message","role":"assistant","text":"ok"}}"#), [.text("ok\n")])
+        for item in [
+            #"{"type":"message","text":"not attributed"}"#,
+            #"{"type":"message","role":true,"text":"invalid role"}"#,
+            #"{"type":"agent_message","role":"user","text":"conflicting role"}"#
+        ] {
+            XCTAssertTrue(CodexJSONParser.parseLine("{\"type\":\"item.completed\",\"item\":\(item)}").isEmpty)
+        }
+    }
+
     func testCheckAndPlanRejectInvalidSandboxAndUnsupportedConstraints() throws {
         let root = try fixture()
         for extra: [String: Any] in [["sandbox": "typo"], ["allowed_tools": []], ["disallowed_tools": []], ["max_output_tokens": 10]] {
