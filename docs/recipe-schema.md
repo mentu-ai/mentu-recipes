@@ -31,20 +31,40 @@ A recipe is a JSON object with a name and a list of steps.
 | `dir` | string | no | Relative step working directory inside workspace. |
 | `env` | object | no | Step-level environment values. |
 | `timeout` | integer | no | Timeout in seconds. Default is 1800. |
-| `completion_keyword` | string | no | Required output text for local completion. |
+| `completion_keyword` | string | no | Required output text for local completion. Codex requires assistant output and a successful structured terminal event. |
 | `depends_on` | array | no | Step labels that must run first. |
 | `max_retries` | integer | no | Number of retries after the first attempt. |
 | `retry_backoff_ms` | integer | no | Wait time between attempts. |
 | `max_output_bytes` | integer | no | Output capture limit. Default is 5000000. |
 | `reasoning` | string | no | Provider reasoning effort when supported. |
-| `thinking` | string | no | Agent CLI thinking option when supported. |
-| `max_output_tokens` | integer | no | Provider output token cap when supported. |
-| `allowed_tools` | array | no | Agent CLI allow-list when supported. |
-| `disallowed_tools` | array | no | Agent CLI deny-list when supported. |
+| `thinking` | string | no | Agent CLI thinking option when supported. Rejected by the Codex CLI adapter. |
+| `max_output_tokens` | integer | no | Provider output token cap when supported. Rejected by the Codex CLI adapter. |
+| `allowed_tools` | array | no | Agent CLI allow-list when supported. Rejected by the Codex CLI adapter, including an empty list. |
+| `disallowed_tools` | array | no | Agent CLI deny-list when supported. Rejected by the Codex CLI adapter, including an empty list. |
+| `sandbox` | string | no | Codex CLI only: `read-only`, `workspace-write` (default), or `danger-full-access`. |
 | `expected_changes` | array | no | Repo-relative paths or globs the step is allowed to commit. |
 | `verify` | object | no | Deterministic verification requirements. |
 
 Each step must provide either `prompt` or `prompt_file`.
+
+### Codex step validation
+
+`sandbox` is a step field. Its value must be one of the three listed modes, and
+the selected backend must be the Codex CLI adapter. Full access requires the
+explicit value `danger-full-access`. The setting controls the Codex child
+process; it does not prevent the runner from writing run artifacts or constrain
+separate recipe hooks and verification commands.
+
+Backend-specific validation follows the same selection order as execution:
+step `backend`, CLI `--backend`, then recipe `backend`. When the backend is
+auto-detected, the runner validates the selected adapter before starting the
+step. `check` validates any backend declared in the recipe; `plan` and execution
+also account for CLI overrides.
+
+For Codex, non-null `allowed_tools`, `disallowed_tools`, `max_output_tokens`, and
+`thinking` values are errors, rather than silently ignored settings. Use
+`reasoning` for reasoning effort. See [Codex CLI](providers.md#codex-cli) for its
+sandbox and completion rules.
 
 ## Recipe Node Fields
 

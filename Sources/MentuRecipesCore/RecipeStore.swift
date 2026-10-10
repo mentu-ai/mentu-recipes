@@ -7,14 +7,14 @@ public struct RecipeStore: Sendable {
         self.paths = paths
     }
 
-    public func load(_ nameOrPath: String) throws -> (RecipeDefinition, URL) {
+    public func load(_ nameOrPath: String, backendOverride: String? = nil) throws -> (RecipeDefinition, URL) {
         guard let url = paths.resolveRecipe(nameOrPath) else {
             throw RecipeError.recipeNotFound(nameOrPath)
         }
         let data = try Data(contentsOf: url)
         do {
             let recipe = try JSONDecoder().decode(RecipeDefinition.self, from: data)
-            try validate(recipe)
+            try validate(recipe, backendOverride: backendOverride)
             return (recipe, url)
         } catch let error as RecipeError {
             throw error
@@ -23,7 +23,7 @@ public struct RecipeStore: Sendable {
         }
     }
 
-    public func validate(_ recipe: RecipeDefinition) throws {
+    public func validate(_ recipe: RecipeDefinition, backendOverride: String? = nil) throws {
         guard !recipe.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw RecipeError.invalidRecipe("name is required")
         }
@@ -51,6 +51,10 @@ public struct RecipeStore: Sendable {
             }
             if step.prompt == nil && step.promptFile == nil {
                 throw RecipeError.missingPrompt(label: step.label)
+            }
+            if let backend = step.backend ?? backendOverride ?? recipe.backend,
+               let adapter = AdapterRegistry.adapter(named: backend, providers: recipe.providers ?? [:]) {
+                try AdapterRegistry.validate(step: step, adapter: adapter)
             }
         }
 

@@ -1,0 +1,17 @@
+{
+  "name": "bounded-review",
+  "type": "sequence",
+  "steps": [
+    {
+      "label": "review",
+      "backend": "codex",
+      "model": "YOUR_CODEX_MODEL",
+      "sandbox": "read-only",
+      "prompt_file": "PROMPT-continuity.md",
+      "completion_keyword": "BOUNDED_REVIEW_COMPLETE",
+      "timeout": 120,
+      "max_retries": 0,
+      "max_output_bytes": 1000000
+    }
+  ]
+}

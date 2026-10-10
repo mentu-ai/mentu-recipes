@@ -29,6 +29,7 @@ this public repo.
 
 - [CLI Reference](cli.md)
 - [Admitted Execution](admitted-execution.md)
+- [Bounded Continuity And Monitor Events](continuity.md)
 - [Cloud Hooks](cloud-hooks.md)
 - [Run Records](run-records.md)
 - [Runtime Intelligence](runtime-intelligence.md)

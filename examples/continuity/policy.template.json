@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "namespace": "bounded-review",
+  "runner": "/absolute/bin/mentu-recipes",
+  "runner_sha256": "REPLACE_WITH_RUNNER_SHA256",
+  "workspace": "/absolute/workspace",
+  "recipe": {
+    "path": "/absolute/workspace/.mentu/recipes/continuity.json",
+    "sha256": "REPLACE_WITH_RECIPE_SHA256"
+  },
+  "backend": "codex",
+  "model": "YOUR_CODEX_MODEL",
+  "journal_dir": "/private/routine/journal",
+  "manifest_var": "CONTINUITY_MANIFEST",
+  "inputs": [
+    {
+      "id": "task",
+      "path": "/absolute/reviewed/task.md",
+      "sha256": "REPLACE_WITH_INPUT_SHA256",
+      "max_bytes": 65536,
+      "timeout_seconds": 10,
+      "use": "authorized_prompt"
+    }
+  ],
+  "inherit_env": ["HOME", "PATH", "CODEX_HOME"],
+  "reporter": {"argv": ["/absolute/bin/idempotent-work-reporter"], "timeout_seconds": 30},
+  "plan_timeout_seconds": 30,
+  "run_timeout_seconds": 150
+}

@@ -100,6 +100,46 @@ unsupported model messages are preserved.
 Agent CLI environments are allow-listed by backend, so an OpenAI key is not
 passed to Claude and an Anthropic key is not passed to Codex.
 
+### Codex CLI
+
+The `codex` backend locates `codex` on the step's effective `PATH` and runs
+`codex exec --json`. It accepts `model` and `reasoning`; `reasoning: "max"` is
+forwarded as `xhigh`.
+
+Each Codex step can set `sandbox`:
+
+| Value | Behavior |
+| --- | --- |
+| `read-only` | Request the Codex CLI's read-only sandbox. |
+| `workspace-write` | Request workspace write access. This is the default. |
+| `danger-full-access` | Request full access explicitly for this step. |
+
+```json
+{
+  "label": "review",
+  "backend": "codex",
+  "prompt": "Review the project and summarize your findings.",
+  "sandbox": "read-only",
+  "timeout": 600
+}
+```
+
+The sandbox setting applies to the Codex child process. The recipe runner still
+writes run records and temporary output files, and recipe hooks and verification
+commands run under their own execution rules. Other backends reject `sandbox`.
+
+Codex steps reject `allowed_tools`, `disallowed_tools`, `max_output_tokens`, and
+`thinking` because this adapter does not enforce those controls. Any non-null
+value is rejected, including an empty tool list. Validation uses the selected
+backend, including a CLI `--backend` override; an explicit step backend still
+takes precedence.
+
+Successful completion requires exit code zero and a structured terminal
+completion event, with no structured failure event. If `completion_keyword` is
+set, it must also appear in the assistant output. A keyword in diagnostics does
+not satisfy this check. A final-message file is accepted only for that completed
+invocation; a previous attempt's output cannot complete a later attempt.
+
 ## Adapter Capabilities
 
 Every backend reports machine-readable capabilities:

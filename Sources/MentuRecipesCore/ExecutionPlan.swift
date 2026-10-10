@@ -116,7 +116,7 @@ final class ExecutionPlanResolver {
         guard !ancestors.contains(source.path) else { throw RecipeError.dependencyCycle }
         let data = try read(source)
         let recipe = try JSONDecoder().decode(RecipeDefinition.self, from: data)
-        try RecipeStore(paths: paths).validate(recipe)
+        try RecipeStore(paths: paths).validate(recipe, backendOverride: options.backend)
         let environment = merged(recipe.env, step: nil, vars: vars)
         var steps: [String: CapturedStep] = [:]
         var summaries: [ExecutionPlan.Step] = []
@@ -124,6 +124,10 @@ final class ExecutionPlanResolver {
             guard let backend = step.backend ?? options.backend ?? recipe.backend else {
                 throw RecipeError.failed("Admitted steps require an explicit backend: \(step.label)")
             }
+            guard let adapter = AdapterRegistry.adapter(named: backend, providers: recipe.providers ?? [:]) else {
+                throw RecipeError.backendUnavailable(backend)
+            }
+            try AdapterRegistry.validate(step: step, adapter: adapter)
             let model = step.model ?? options.model ?? recipe.model ?? recipe.providers?[backend]?.model
             guard backend == "shell" || model?.isEmpty == false else {
                 throw RecipeError.failed("Admitted agent steps require an explicit model: \(step.label)")

@@ -11,29 +11,34 @@ public struct CodexCLIAdapter: BackendAdapter {
     public init() {}
 
     public func isAvailable(env: [String: String]) -> Bool {
-        ProcessRunner.findExecutable("codex") != nil
+        Self.findExecutable(env: env) != nil
     }
 
     public func execute(_ request: AdapterRequest, eventSink: @escaping (String) -> Void) async throws -> AdapterResult {
-        guard let executable = ProcessRunner.findExecutable("codex") else {
+        try Self.validateOptions(allowedTools: request.allowedTools, disallowedTools: request.disallowedTools,
+                                 maxOutputTokens: request.maxOutputTokens, thinking: request.thinking)
+        guard let executable = Self.findExecutable(env: request.env) else {
             throw RecipeError.backendUnavailable("codex")
         }
 
         let prompt = Self.effectivePrompt(request)
-        let lastMessage = try? Self.lastMessagePath(in: request.workingDirectory, sessionName: request.sessionName)
+        // Each invocation owns a fresh directory. A previous run or retry can
+        // never supply this invocation's final message, even after a crash.
+        let lastMessage = try Self.lastMessagePath(in: request.workingDirectory)
+        defer { try? FileManager.default.removeItem(at: lastMessage.deletingLastPathComponent()) }
         var parser = CodexJSONParser()
         var parsedText = ""
         var inputTokens: Int?
         var outputTokens: Int?
         var providerCompleted = false
+        var providerFailure: String?
         var lastErrorMessage: String?
 
         var args = [
             "exec",
             "--json",
             "--color", "never",
-            "--dangerously-bypass-approvals-and-sandbox",
-            "-s", "danger-full-access",
+            "--sandbox", (request.sandbox ?? .workspaceWrite).rawValue,
             "-C", request.workingDirectory.path,
             "--skip-git-repo-check"
         ]
@@ -43,10 +48,7 @@ public struct CodexCLIAdapter: BackendAdapter {
         if let reasoning = Self.normalizedReasoningEffort(request.reasoning) {
             args += ["-c", "model_reasoning_effort=\"\(reasoning)\""]
         }
-        if let lastMessage {
-            args += ["--output-last-message", lastMessage.path]
-        }
-        args.append(prompt)
+        args += ["--output-last-message", lastMessage.path, "--", prompt]
 
         let result = try await ProcessRunner.run(
             executable: executable,
@@ -71,6 +73,9 @@ public struct CodexCLIAdapter: BackendAdapter {
                             lastErrorMessage = message
                             eventSink("Error: \(message)\n")
                         }
+                    case .failure(let message):
+                        providerFailure = message
+                        eventSink("Error: \(message)\n")
                     }
                 }
             },
@@ -94,22 +99,56 @@ public struct CodexCLIAdapter: BackendAdapter {
                     lastErrorMessage = message
                     eventSink("Error: \(message)\n")
                 }
+            case .failure(let message):
+                providerFailure = message
+                eventSink("Error: \(message)\n")
             }
         }
 
-        if parsedText.isEmpty, let lastMessage, let text = try? String(contentsOf: lastMessage, encoding: .utf8), !text.isEmpty {
+        let complete = result.exitCode == 0 && providerCompleted && providerFailure == nil
+        if complete, parsedText.isEmpty, let text = try? String(contentsOf: lastMessage, encoding: .utf8), !text.isEmpty {
             parsedText = text.hasSuffix("\n") ? text : text + "\n"
             eventSink(parsedText)
         }
 
+        var diagnostics = Self.sanitizedDiagnostics(result.stderr)
+        if !complete {
+            diagnostics += "\nCodex did not produce a successful structured completion.\n"
+            if let providerFailure { diagnostics += providerFailure + "\n" }
+        }
         return AdapterResult(
-            stdout: parsedText.isEmpty ? result.stdout : parsedText,
-            stderr: Self.sanitizedDiagnostics(result.stderr),
-            exitCode: result.exitCode,
-            providerCompleted: result.exitCode == 0 && providerCompleted,
+            stdout: parsedText,
+            stderr: diagnostics,
+            exitCode: complete ? 0 : (result.exitCode == 0 ? 1 : result.exitCode),
+            providerCompleted: complete,
             inputTokens: inputTokens,
             outputTokens: outputTokens
         )
+    }
+
+    public static func validate(step: RecipeStep) throws {
+        try validateOptions(allowedTools: step.allowedTools, disallowedTools: step.disallowedTools,
+                            maxOutputTokens: step.maxOutputTokens, thinking: step.thinking)
+    }
+
+    private static func validateOptions(allowedTools: [String]?, disallowedTools: [String]?,
+                                        maxOutputTokens: Int?, thinking: String?) throws {
+        let unsupported: [(String, Bool)] = [
+            ("allowed_tools", allowedTools != nil), ("disallowed_tools", disallowedTools != nil),
+            ("max_output_tokens", maxOutputTokens != nil), ("thinking", thinking != nil)
+        ]
+        for (field, present) in unsupported where present {
+            throw RecipeError.invalidRecipe("Codex CLI does not enforce \(field); remove it or choose a backend that supports it")
+        }
+    }
+
+    private static func findExecutable(env: [String: String]) -> String? {
+        let path = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        for directory in path.split(separator: ":") {
+            let candidate = String(directory) + "/codex"
+            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+        }
+        return nil
     }
 
     public static func agentEnvironment(from env: [String: String]) -> [String: String] {
@@ -147,13 +186,11 @@ public struct CodexCLIAdapter: BackendAdapter {
         }
     }
 
-    private static func lastMessagePath(in workspace: URL, sessionName: String?) throws -> URL {
-        let dir = workspace.appendingPathComponent(".mentu/tmp", isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let label = (sessionName ?? "codex")
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: " ", with: "-")
-        return dir.appendingPathComponent("\(label)-last-message.txt")
+    private static func lastMessagePath(in workspace: URL) throws -> URL {
+        let dir = workspace.appendingPathComponent(".mentu/tmp/codex-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
+        return dir.appendingPathComponent("last-message.txt")
     }
 
     private static func sanitizedDiagnostics(_ stderr: String) -> String {
@@ -170,6 +207,7 @@ public struct CodexJSONParser: Sendable {
         case text(String)
         case complete(inputTokens: Int?, outputTokens: Int?)
         case error(String)
+        case failure(String)
     }
 
     private var pending = ""
@@ -230,7 +268,10 @@ public struct CodexJSONParser: Sendable {
                   let payloadType = payload["type"] as? String else { return [] }
             return parsePayload(type: payloadType, payload: payload)
 
-        case "error", "stream_error":
+        case "turn.failed", "task.failed", "task_failed", "error":
+            return [.failure(errorMessage(json["error"] ?? json["message"]) ?? "Codex reported a failed turn")]
+
+        case "stream_error":
             return [.error(errorMessage(json["message"] ?? json["error"]) ?? "Codex reported an error")]
 
         default:
@@ -256,7 +297,9 @@ public struct CodexJSONParser: Sendable {
             }
             events.append(.complete(inputTokens: intValue(usage?["input_tokens"]), outputTokens: intValue(usage?["output_tokens"])))
             return events
-        case "stream_error", "error":
+        case "turn.failed", "task.failed", "task_failed", "error":
+            return [.failure(errorMessage(payload["error"] ?? payload["message"]) ?? "Codex reported a failed turn")]
+        case "stream_error":
             return [.error(errorMessage(payload["message"] ?? payload["error"]) ?? "Codex reported an error")]
         default:
             return []

@@ -187,7 +187,7 @@ public final class RecipeRunner {
     }
 
     private func start(_ nameOrPath: String, assignedRunId: String? = nil) async throws -> RecipeRunRecord {
-        let (recipe, recipeURL) = try captured.map { ($0.recipe, $0.source) } ?? store.load(nameOrPath)
+        let (recipe, recipeURL) = try captured.map { ($0.recipe, $0.source) } ?? store.load(nameOrPath, backendOverride: options.backend)
         let runId = assignedRunId ?? "run_\(Self.timestampForID())_\(UUID().uuidString.prefix(8))"
         let runDir = paths.projectRuns.appendingPathComponent(runId)
         guard !FileManager.default.fileExists(atPath: runDir.path) else {
@@ -300,7 +300,7 @@ public final class RecipeRunner {
         }
         let state = try RunStateStore.load(runDir: runDir)
         let snapshot = await state.snapshot()
-        let (recipe, _) = try captured.map { ($0.recipe, $0.source) } ?? store.load(snapshot.recipeRef)
+        let (recipe, _) = try captured.map { ($0.recipe, $0.source) } ?? store.load(snapshot.recipeRef, backendOverride: options.backend)
         if let retryStep {
             guard runnableLabels(recipe).contains(retryStep) else { throw RecipeError.failed("Unknown retry step: \(retryStep)") }
             if captured != nil, !recipe.steps.isEmpty {
@@ -800,6 +800,7 @@ public final class RecipeRunner {
         } else {
             throw RecipeError.missingBackend(label: step.label)
         }
+        try AdapterRegistry.validate(step: step, adapter: adapter)
         await events.emit(.backendSelected, stepLabel: step.label, backend: adapter.name, status: "selected")
 
         let promptVars = env.merging(vars) { _, new in new }
@@ -859,6 +860,7 @@ public final class RecipeRunner {
                     maxOutputTokens: step.maxOutputTokens,
                     allowedTools: step.allowedTools,
                     disallowedTools: step.disallowedTools,
+                    sandbox: step.sandbox,
                     sessionName: "mentu-recipes-\(recipe.name)-\(step.label)",
                     workingDirectory: stepDir
                 ),
@@ -1053,8 +1055,10 @@ public final class RecipeRunner {
 
     private func localComplete(step: RecipeStep, adapter: BackendAdapter, result: AdapterResult) -> Bool {
         guard result.exitCode == 0 else { return false }
+        // A keyword supplements Codex's terminal event; it cannot replace it.
+        if adapter is CodexCLIAdapter, !result.providerCompleted { return false }
         if let keyword = step.completionKeyword, !keyword.isEmpty {
-            return result.stdout.contains(keyword) || result.stderr.contains(keyword)
+            return result.stdout.contains(keyword) || (!(adapter is CodexCLIAdapter) && result.stderr.contains(keyword))
         }
         switch adapter.completionPolicy {
         case .shellExitCode:

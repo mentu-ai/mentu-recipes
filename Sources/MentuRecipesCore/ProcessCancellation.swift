@@ -41,7 +41,15 @@ final class ProcessCancellation: @unchecked Sendable {
         escalation = nil
     }
 
-    private func forceIfRunning() {
+    /// Timeouts share the owned-process signaling policy with cancellation,
+    /// but retain their distinct exit status and uncertain admission state.
+    func terminateForTimeout() {
+        lock.lock(); defer { lock.unlock() }
+        guard started, !finished, process.isRunning else { return }
+        signalOwnedProcess(SIGTERM)
+    }
+
+    func forceIfRunning() {
         lock.lock(); defer { lock.unlock() }
         guard started, !finished, process.isRunning else { return }
         signalOwnedProcess(SIGKILL)

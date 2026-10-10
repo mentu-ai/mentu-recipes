@@ -50,6 +50,16 @@ This repository is a Claude Code marketplace. The plugin carries two skills,
 
 ## Then choose your path
 
+### Using Codex or programmatic actions?
+
+The runner also executes recipes through `codex exec`, using the local CLI's
+authentication. Declare `"backend":"codex"` and an explicit `sandbox` in the
+step. See [provider capabilities](docs/providers.md).
+
+For a ticket, scheduled action, or Monitor Protocol event to trigger a bounded
+recipe and publish a durable outcome, see [Continuity](docs/continuity.md).
+The optional adapters use the same admission and run records across providers.
+
 | I want to | Start here |
 | --- | --- |
 | **Run a recipe** and see the contract enforced | [Run a recipe](#run-a-recipe) |

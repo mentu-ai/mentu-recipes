@@ -98,9 +98,9 @@ public enum ProcessRunner {
             }
 
             if timedOut {
-                process.terminate()
+                cancellation.terminateForTimeout()
                 if !(await completedBeforeTimeout(exitTask, seconds: 2)) {
-                    kill(process.processIdentifier, SIGKILL)
+                    cancellation.forceIfRunning()
                     await exitTask.value
                 }
             }
@@ -140,7 +140,15 @@ public enum ProcessRunner {
         DispatchQueue.global(qos: .utility).async {
             defer { group.leave() }
             while true {
-                let data = handle.readData(ofLength: 8192)
+                // Timeout can close this pipe while a reader is blocked. The
+                // throwing API reports that closure without an Objective-C
+                // exception terminating the runner.
+                let data: Data
+                do {
+                    data = try handle.read(upToCount: 8192) ?? Data()
+                } catch {
+                    break
+                }
                 if data.isEmpty { break }
                 guard let text = String(data: data, encoding: .utf8), !text.isEmpty else { continue }
                 append(text)

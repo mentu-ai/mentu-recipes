@@ -158,7 +158,7 @@ final class MentuRecipesCoreTests: XCTestCase {
         XCTAssertEqual(complete, [.complete(inputTokens: 11, outputTokens: 7)])
 
         let nestedError = CodexJSONParser.parseLine(#"{"type":"error","message":"{\"error\":{\"message\":\"model is not supported\"}}"}"#)
-        XCTAssertEqual(nestedError, [.error("model is not supported")])
+        XCTAssertEqual(nestedError, [.failure("model is not supported")])
     }
 
     func testClaudeJSONParserStreamsTextAndSuppressesDiagnostics() {

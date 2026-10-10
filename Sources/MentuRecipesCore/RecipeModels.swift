@@ -132,6 +132,13 @@ public enum ChatCompletionTokenField: String, Codable, Sendable {
     case maxCompletionTokens = "max_completion_tokens"
 }
 
+/// Codex CLI sandbox policy. Full access always requires an explicit recipe value.
+public enum CodexSandboxMode: String, Codable, Sendable {
+    case readOnly = "read-only"
+    case workspaceWrite = "workspace-write"
+    case dangerFullAccess = "danger-full-access"
+}
+
 public struct RecipeStep: Codable, Sendable {
     public let label: String
     public let backend: String?
@@ -151,6 +158,7 @@ public struct RecipeStep: Codable, Sendable {
     public let maxOutputTokens: Int?
     public let allowedTools: [String]?
     public let disallowedTools: [String]?
+    public let sandbox: CodexSandboxMode?
     public let expectedChanges: [String]?
     public let verify: VerifyRequirements?
 
@@ -173,6 +181,7 @@ public struct RecipeStep: Codable, Sendable {
         maxOutputTokens: Int? = nil,
         allowedTools: [String]? = nil,
         disallowedTools: [String]? = nil,
+        sandbox: CodexSandboxMode? = nil,
         expectedChanges: [String]? = nil,
         verify: VerifyRequirements? = nil
     ) {
@@ -194,6 +203,7 @@ public struct RecipeStep: Codable, Sendable {
         self.maxOutputTokens = maxOutputTokens
         self.allowedTools = allowedTools
         self.disallowedTools = disallowedTools
+        self.sandbox = sandbox
         self.expectedChanges = expectedChanges
         self.verify = verify
     }
@@ -211,6 +221,7 @@ public struct RecipeStep: Codable, Sendable {
         case maxOutputTokens = "max_output_tokens"
         case allowedTools = "allowed_tools"
         case disallowedTools = "disallowed_tools"
+        case sandbox
         case expectedChanges = "expected_changes"
         case verify
     }

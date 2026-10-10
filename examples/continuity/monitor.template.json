@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "base_url": "https://monitor.example.org",
+  "subscription": "PREPROVISIONED_DEDICATED_SUBSCRIPTION",
+  "token_file": "/private/routine/subscription-token",
+  "journal_dir": "/private/routine/consumer-journal",
+  "policy": {
+    "path": "/private/routine/policy.json",
+    "sha256": "REPLACE_WITH_POLICY_FILE_SHA256"
+  },
+  "standing_authorization": true,
+  "allowed_source": "monitor:approved-review-source",
+  "allowed_type": "ai.mentu.review.requested",
+  "work_ref": "ticket:review-123",
+  "work_ref_field": "subject",
+  "request_timeout_seconds": 5
+}

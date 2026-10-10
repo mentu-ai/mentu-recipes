@@ -33,6 +33,7 @@ public struct AdapterRequest: Sendable {
     public let maxOutputTokens: Int?
     public let allowedTools: [String]?
     public let disallowedTools: [String]?
+    public let sandbox: CodexSandboxMode?
     public let sessionName: String?
     public let workingDirectory: URL
 
@@ -48,6 +49,7 @@ public struct AdapterRequest: Sendable {
         maxOutputTokens: Int? = nil,
         allowedTools: [String]? = nil,
         disallowedTools: [String]? = nil,
+        sandbox: CodexSandboxMode? = nil,
         sessionName: String? = nil,
         workingDirectory: URL
     ) {
@@ -62,6 +64,7 @@ public struct AdapterRequest: Sendable {
         self.maxOutputTokens = maxOutputTokens
         self.allowedTools = allowedTools
         self.disallowedTools = disallowedTools
+        self.sandbox = sandbox
         self.sessionName = sessionName
         self.workingDirectory = workingDirectory
     }
@@ -150,8 +153,8 @@ public extension BackendAdapter {
             requiresNetwork: isHTTP && !isOllama,
             requiresCredential: isHTTP && !isOllama,
             supportsTools: isAgent,
-            supportsToolAllowList: isAgent,
-            supportsToolDenyList: isAgent,
+            supportsToolAllowList: isAgent && name != "codex",
+            supportsToolDenyList: isAgent && name != "codex",
             supportsReasoning: isAgent || name == "openai",
             supportsThinking: name == "claude",
             supportsMaxOutputTokens: isHTTP || name == "openai",
@@ -163,6 +166,14 @@ public extension BackendAdapter {
 }
 
 public enum AdapterRegistry {
+    static func validate(step: RecipeStep, adapter: BackendAdapter) throws {
+        if adapter is CodexCLIAdapter {
+            try CodexCLIAdapter.validate(step: step)
+        } else if step.sandbox != nil {
+            throw RecipeError.invalidRecipe("Step '\(step.label)': sandbox is supported only by the Codex CLI adapter")
+        }
+    }
+
     public static func adapter(
         named requestedName: String,
         providers: [String: ProviderConfig] = [:]
